@@ -1,8 +1,8 @@
 package utils;
 
-
 import java.awt.BasicStroke;
 import java.awt.Color;
+import java.awt.FileDialog;
 import java.awt.Font;
 import java.awt.FontMetrics;
 import java.awt.Graphics2D;
@@ -16,8 +16,11 @@ import java.awt.event.KeyListener;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseListener;
 import java.awt.event.MouseMotionListener;
+import java.awt.geom.Arc2D;
 import java.awt.geom.Ellipse2D;
+import java.awt.geom.GeneralPath;
 import java.awt.geom.Line2D;
+import java.awt.geom.Rectangle2D;
 import java.awt.image.BufferedImage;
 import java.awt.image.DirectColorModel;
 import java.awt.image.WritableRaster;
@@ -25,10 +28,7 @@ import java.io.File;
 import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.LinkedList;
-import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.TreeSet;
 
@@ -39,21 +39,10 @@ import javax.swing.JLabel;
 import javax.swing.JMenu;
 import javax.swing.JMenuBar;
 import javax.swing.JMenuItem;
-import javax.swing.JOptionPane;
 
-import org.json.JSONException;
-import org.json.JSONObject;
-
-import Server.game_service;
-import dataStructure.DGraph;
-import dataStructure.edge_data;
-import dataStructure.graph;
-import dataStructure.node_data;
-import elements.Fruit;
-import elements.RobotG;
 import gameClient.MyGameGUI;
-public final class StdDraw implements ActionListener, MouseListener, MouseMotionListener, KeyListener 
-{
+
+public final class StdDraw implements ActionListener, MouseListener, MouseMotionListener, KeyListener {
 
 	/**
 	 *  The color black.
@@ -151,7 +140,6 @@ public final class StdDraw implements ActionListener, MouseListener, MouseMotion
 	// current pen color
 	private static Color penColor;
 
-	// default canvas size is DEFAULT_SIZE-by-DEFAULT_SIZE
 	private static final int DEFAULT_SIZE = 512;
 	private static final int DEFAULT_WIDTH_SIZE = 1239;
 	private static final int DEFAULT_HEIGHT_SIZE = 595;
@@ -207,25 +195,14 @@ public final class StdDraw implements ActionListener, MouseListener, MouseMotion
 	// set of key codes currently pressed down
 	private static TreeSet<Integer> keysDown = new TreeSet<Integer>();
 
-	/**************************************
-	 * Attributes
-	 ****************************************/
-	private final static double eps = 0.00019;
-	public static Range rx, ry;
-	private static DGraph dGraph;
-	private final static double epsilon = 0.0000001;
-	private static boolean restart = false;
-	private static game_service aux;
-	private static List<Fruit> fruits_List = new ArrayList<>();
-	public static List<RobotG> robots_List = new ArrayList<>();
-	
-	
-	
 	// singleton pattern: client can't instantiate
 	private StdDraw() { }
 
 
-
+	// static initializer
+	static {
+		init();
+	}
 
 	/**
 	 * Sets the canvas (drawing area) to be 512-by-512 pixels.
@@ -239,17 +216,16 @@ public final class StdDraw implements ActionListener, MouseListener, MouseMotion
 		height = DEFAULT_HEIGHT_SIZE;
 	}
 
-	
+
 	/** 
 	 * - init new frame
 	 * - read game data(i.e fruits, robots, graph) from given game
 	 * - parse robots and fruits from JSON and display them on the frame
 	 * 
 	 **/
-	public static void init(game_service game) 
+	public static void init() 
 	{
-		aux = game;
-		if (frame != null && restart) frame.setVisible(false);
+		if (frame != null) frame.setVisible(false);
 		frame = new JFrame();
 		offscreenImage = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
 		onscreenImage  = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
@@ -285,25 +261,8 @@ public final class StdDraw implements ActionListener, MouseListener, MouseMotion
 		frame.requestFocusInWindow();
 		frame.setLocationRelativeTo(null);
 		picture(0.5, 0.5, "map.png");
-		String fromGame = "";
-		fromGame =  game.getGraph() ;
-		dGraph = new DGraph();
-		dGraph.init(fromGame);
-		drawGraph(dGraph);
 		frame.setVisible(true);
-		
-		//
-		String info = game.toString();
-		System.out.println(info);
-		//
-		parseFruits(game.getFruits());
-		drawRobots(getRobot(game.toString()), game);
-		game.startGame();
-		setFont();
-		setPenColor(BLUE);
-		text( rx.get_max()-0.002, ry.get_max()-0.0005,"time to end: "+game.timeToEnd()/1000);
 	}
-
 
 
 	// create the menu bar (changed to private)
@@ -594,9 +553,255 @@ public final class StdDraw implements ActionListener, MouseListener, MouseMotion
 		draw();
 	}
 
+	/**
+	 * Draws a circle of the specified radius, centered at (<em>x</em>, <em>y</em>).
+	 *
+	 * @param  x the <em>x</em>-coordinate of the center of the circle
+	 * @param  y the <em>y</em>-coordinate of the center of the circle
+	 * @param  radius the radius of the circle
+	 * @throws IllegalArgumentException if {@code radius} is negative
+	 */
+	public static void circle(double x, double y, double radius) {
+		if (!(radius >= 0)) throw new IllegalArgumentException("radius must be nonnegative");
+		double xs = scaleX(x);
+		double ys = scaleY(y);
+		double ws = factorX(2*radius);
+		double hs = factorY(2*radius);
+		if (ws <= 1 && hs <= 1) pixel(x, y);
+		else offscreen.draw(new Ellipse2D.Double(xs - ws/2, ys - hs/2, ws, hs));
+		draw();
+	}
+
+	/**
+	 * Draws a filled circle of the specified radius, centered at (<em>x</em>, <em>y</em>).
+	 *
+	 * @param  x the <em>x</em>-coordinate of the center of the circle
+	 * @param  y the <em>y</em>-coordinate of the center of the circle
+	 * @param  radius the radius of the circle
+	 * @throws IllegalArgumentException if {@code radius} is negative
+	 */
+	public static void filledCircle(double x, double y, double radius) {
+		if (!(radius >= 0)) throw new IllegalArgumentException("radius must be nonnegative");
+		double xs = scaleX(x);
+		double ys = scaleY(y);
+		double ws = factorX(2*radius);
+		double hs = factorY(2*radius);
+		if (ws <= 1 && hs <= 1) pixel(x, y);
+		else offscreen.fill(new Ellipse2D.Double(xs - ws/2, ys - hs/2, ws, hs));
+		draw();
+	}
 
 
+	/**
+	 * Draws an ellipse with the specified semimajor and semiminor axes,
+	 * centered at (<em>x</em>, <em>y</em>).
+	 *
+	 * @param  x the <em>x</em>-coordinate of the center of the ellipse
+	 * @param  y the <em>y</em>-coordinate of the center of the ellipse
+	 * @param  semiMajorAxis is the semimajor axis of the ellipse
+	 * @param  semiMinorAxis is the semiminor axis of the ellipse
+	 * @throws IllegalArgumentException if either {@code semiMajorAxis}
+	 *         or {@code semiMinorAxis} is negative
+	 */
+	public static void ellipse(double x, double y, double semiMajorAxis, double semiMinorAxis) {
+		if (!(semiMajorAxis >= 0)) throw new IllegalArgumentException("ellipse semimajor axis must be nonnegative");
+		if (!(semiMinorAxis >= 0)) throw new IllegalArgumentException("ellipse semiminor axis must be nonnegative");
+		double xs = scaleX(x);
+		double ys = scaleY(y);
+		double ws = factorX(2*semiMajorAxis);
+		double hs = factorY(2*semiMinorAxis);
+		if (ws <= 1 && hs <= 1) pixel(x, y);
+		else offscreen.draw(new Ellipse2D.Double(xs - ws/2, ys - hs/2, ws, hs));
+		draw();
+	}
 
+	/**
+	 * Draws an ellipse with the specified semimajor and semiminor axes,
+	 * centered at (<em>x</em>, <em>y</em>).
+	 *
+	 * @param  x the <em>x</em>-coordinate of the center of the ellipse
+	 * @param  y the <em>y</em>-coordinate of the center of the ellipse
+	 * @param  semiMajorAxis is the semimajor axis of the ellipse
+	 * @param  semiMinorAxis is the semiminor axis of the ellipse
+	 * @throws IllegalArgumentException if either {@code semiMajorAxis}
+	 *         or {@code semiMinorAxis} is negative
+	 */
+	public static void filledEllipse(double x, double y, double semiMajorAxis, double semiMinorAxis) {
+		if (!(semiMajorAxis >= 0)) throw new IllegalArgumentException("ellipse semimajor axis must be nonnegative");
+		if (!(semiMinorAxis >= 0)) throw new IllegalArgumentException("ellipse semiminor axis must be nonnegative");
+		double xs = scaleX(x);
+		double ys = scaleY(y);
+		double ws = factorX(2*semiMajorAxis);
+		double hs = factorY(2*semiMinorAxis);
+		if (ws <= 1 && hs <= 1) pixel(x, y);
+		else offscreen.fill(new Ellipse2D.Double(xs - ws/2, ys - hs/2, ws, hs));
+		draw();
+	}
+
+
+	/**
+	 * Draws a circular arc of the specified radius,
+	 * centered at (<em>x</em>, <em>y</em>), from angle1 to angle2 (in degrees).
+	 *
+	 * @param  x the <em>x</em>-coordinate of the center of the circle
+	 * @param  y the <em>y</em>-coordinate of the center of the circle
+	 * @param  radius the radius of the circle
+	 * @param  angle1 the starting angle. 0 would mean an arc beginning at 3 o'clock.
+	 * @param  angle2 the angle at the end of the arc. For example, if
+	 *         you want a 90 degree arc, then angle2 should be angle1 + 90.
+	 * @throws IllegalArgumentException if {@code radius} is negative
+	 */
+	public static void arc(double x, double y, double radius, double angle1, double angle2) {
+		if (radius < 0) throw new IllegalArgumentException("arc radius must be nonnegative");
+		while (angle2 < angle1) angle2 += 360;
+		double xs = scaleX(x);
+		double ys = scaleY(y);
+		double ws = factorX(2*radius);
+		double hs = factorY(2*radius);
+		if (ws <= 1 && hs <= 1) pixel(x, y);
+		else offscreen.draw(new Arc2D.Double(xs - ws/2, ys - hs/2, ws, hs, angle1, angle2 - angle1, Arc2D.OPEN));
+		draw();
+	}
+
+	/**
+	 * Draws a square of side length 2r, centered at (<em>x</em>, <em>y</em>).
+	 *
+	 * @param  x the <em>x</em>-coordinate of the center of the square
+	 * @param  y the <em>y</em>-coordinate of the center of the square
+	 * @param  halfLength one half the length of any side of the square
+	 * @throws IllegalArgumentException if {@code halfLength} is negative
+	 */
+	public static void square(double x, double y, double halfLength) {
+		if (!(halfLength >= 0)) throw new IllegalArgumentException("half length must be nonnegative");
+		double xs = scaleX(x);
+		double ys = scaleY(y);
+		double ws = factorX(2*halfLength);
+		double hs = factorY(2*halfLength);
+		if (ws <= 1 && hs <= 1) pixel(x, y);
+		else offscreen.draw(new Rectangle2D.Double(xs - ws/2, ys - hs/2, ws, hs));
+		draw();
+	}
+
+	/**
+	 * Draws a filled square of the specified size, centered at (<em>x</em>, <em>y</em>).
+	 *
+	 * @param  x the <em>x</em>-coordinate of the center of the square
+	 * @param  y the <em>y</em>-coordinate of the center of the square
+	 * @param  halfLength one half the length of any side of the square
+	 * @throws IllegalArgumentException if {@code halfLength} is negative
+	 */
+	public static void filledSquare(double x, double y, double halfLength) {
+		if (!(halfLength >= 0)) throw new IllegalArgumentException("half length must be nonnegative");
+		double xs = scaleX(x);
+		double ys = scaleY(y);
+		double ws = factorX(2*halfLength);
+		double hs = factorY(2*halfLength);
+		if (ws <= 1 && hs <= 1) pixel(x, y);
+		else offscreen.fill(new Rectangle2D.Double(xs - ws/2, ys - hs/2, ws, hs));
+		draw();
+	}
+
+
+	/**
+	 * Draws a rectangle of the specified size, centered at (<em>x</em>, <em>y</em>).
+	 *
+	 * @param  x the <em>x</em>-coordinate of the center of the rectangle
+	 * @param  y the <em>y</em>-coordinate of the center of the rectangle
+	 * @param  halfWidth one half the width of the rectangle
+	 * @param  halfHeight one half the height of the rectangle
+	 * @throws IllegalArgumentException if either {@code halfWidth} or {@code halfHeight} is negative
+	 */
+	public static void rectangle(double x, double y, double halfWidth, double halfHeight) {
+		if (!(halfWidth  >= 0)) throw new IllegalArgumentException("half width must be nonnegative");
+		if (!(halfHeight >= 0)) throw new IllegalArgumentException("half height must be nonnegative");
+		double xs = scaleX(x);
+		double ys = scaleY(y);
+		double ws = factorX(2*halfWidth);
+		double hs = factorY(2*halfHeight);
+		if (ws <= 1 && hs <= 1) pixel(x, y);
+		else offscreen.draw(new Rectangle2D.Double(xs - ws/2, ys - hs/2, ws, hs));
+		draw();
+	}
+
+	/**
+	 * Draws a filled rectangle of the specified size, centered at (<em>x</em>, <em>y</em>).
+	 *
+	 * @param  x the <em>x</em>-coordinate of the center of the rectangle
+	 * @param  y the <em>y</em>-coordinate of the center of the rectangle
+	 * @param  halfWidth one half the width of the rectangle
+	 * @param  halfHeight one half the height of the rectangle
+	 * @throws IllegalArgumentException if either {@code halfWidth} or {@code halfHeight} is negative
+	 */
+	public static void filledRectangle(double x, double y, double halfWidth, double halfHeight) {
+		if (!(halfWidth  >= 0)) throw new IllegalArgumentException("half width must be nonnegative");
+		if (!(halfHeight >= 0)) throw new IllegalArgumentException("half height must be nonnegative");
+		double xs = scaleX(x);
+		double ys = scaleY(y);
+		double ws = factorX(2*halfWidth);
+		double hs = factorY(2*halfHeight);
+		if (ws <= 1 && hs <= 1) pixel(x, y);
+		else offscreen.fill(new Rectangle2D.Double(xs - ws/2, ys - hs/2, ws, hs));
+		draw();
+	}
+
+
+	/**
+	 * Draws a polygon with the vertices 
+	 * (<em>x</em><sub>0</sub>, <em>y</em><sub>0</sub>),
+	 * (<em>x</em><sub>1</sub>, <em>y</em><sub>1</sub>), ...,
+	 * (<em>x</em><sub><em>n</em>ג€�?1</sub>, <em>y</em><sub><em>n</em>ג€�?1</sub>).
+	 *
+	 * @param  x an array of all the <em>x</em>-coordinates of the polygon
+	 * @param  y an array of all the <em>y</em>-coordinates of the polygon
+	 * @throws IllegalArgumentException unless {@code x[]} and {@code y[]}
+	 *         are of the same length
+	 */
+	public static void polygon(double[] x, double[] y) {
+		if (x == null) throw new IllegalArgumentException("x-coordinate array is null");
+		if (y == null) throw new IllegalArgumentException("y-coordinate array is null");
+		int n1 = x.length;
+		int n2 = y.length;
+		if (n1 != n2) throw new IllegalArgumentException("arrays must be of the same length");
+		int n = n1;
+		if (n == 0) return;
+
+		GeneralPath path = new GeneralPath();
+		path.moveTo((float) scaleX(x[0]), (float) scaleY(y[0]));
+		for (int i = 0; i < n; i++)
+			path.lineTo((float) scaleX(x[i]), (float) scaleY(y[i]));
+		path.closePath();
+		offscreen.draw(path);
+		draw();
+	}
+
+	/**
+	 * Draws a polygon with the vertices 
+	 * (<em>x</em><sub>0</sub>, <em>y</em><sub>0</sub>),
+	 * (<em>x</em><sub>1</sub>, <em>y</em><sub>1</sub>), ...,
+	 * (<em>x</em><sub><em>n</em>ג€�?1</sub>, <em>y</em><sub><em>n</em>ג€�?1</sub>).
+	 *
+	 * @param  x an array of all the <em>x</em>-coordinates of the polygon
+	 * @param  y an array of all the <em>y</em>-coordinates of the polygon
+	 * @throws IllegalArgumentException unless {@code x[]} and {@code y[]}
+	 *         are of the same length
+	 */
+	public static void filledPolygon(double[] x, double[] y) {
+		if (x == null) throw new IllegalArgumentException("x-coordinate array is null");
+		if (y == null) throw new IllegalArgumentException("y-coordinate array is null");
+		int n1 = x.length;
+		int n2 = y.length;
+		if (n1 != n2) throw new IllegalArgumentException("arrays must be of the same length");
+		int n = n1;
+		if (n == 0) return;
+
+		GeneralPath path = new GeneralPath();
+		path.moveTo((float) scaleX(x[0]), (float) scaleY(y[0]));
+		for (int i = 0; i < n; i++)
+			path.lineTo((float) scaleX(x[i]), (float) scaleY(y[i]));
+		path.closePath();
+		offscreen.fill(path);
+		draw();
+	}
 
 
 	/***************************************************************************
@@ -998,21 +1203,18 @@ public final class StdDraw implements ActionListener, MouseListener, MouseMotion
 		}
 	}
 
+
 	/**
 	 * This method cannot be called directly.
 	 */
 	@Override
-	public void actionPerformed(ActionEvent e) 
-	{
-		if(e.getActionCommand() == "Restart")
-		{
-			init(aux);
+	public void actionPerformed(ActionEvent e) {
+		FileDialog chooser = new FileDialog(StdDraw.frame, "Use a .png or .jpg extension", FileDialog.SAVE);
+		chooser.setVisible(true);
+		String filename = chooser.getFile();
+		if (filename != null) {
+			StdDraw.save(chooser.getDirectory() + File.separator + chooser.getFile());
 		}
-		else if(e.getActionCommand() == "Exit")
-		{
-			System.exit(0);
-		}
-
 	}
 
 
@@ -1071,8 +1273,7 @@ public final class StdDraw implements ActionListener, MouseListener, MouseMotion
 	 * This method cannot be called directly.
 	 */
 	@Override
-	public void mouseClicked(MouseEvent e) 
-	{
+	public void mouseClicked(MouseEvent e) {
 		// this body is intentionally left empty
 	}
 
@@ -1096,10 +1297,8 @@ public final class StdDraw implements ActionListener, MouseListener, MouseMotion
 	 * This method cannot be called directly.
 	 */
 	@Override
-	public void mousePressed(MouseEvent e) 
-	{
-		synchronized (mouseLock) 
-		{
+	public void mousePressed(MouseEvent e) {
+		synchronized (mouseLock) {
 			mouseX = StdDraw.userX(e.getX());
 			mouseY = StdDraw.userY(e.getY());
 			isMousePressed = true;
@@ -1112,19 +1311,8 @@ public final class StdDraw implements ActionListener, MouseListener, MouseMotion
 	@Override
 	public void mouseReleased(MouseEvent e) 
 	{
-		node_data dest = searchForNext(mouseX, mouseY);
-		RobotG r = updateClosestRobot(dest);
-		if(dGraph.getEdge(r.getSrcNode(), dest.getKey()) != null)
-		{
-			updateFruits(dest, r);
-			r.setNextNode(dest.getKey());
-			while(r.getLocation().distance2D(dest.getLocation()) > 0.0000001)
-			{
-				r.move();
-			}
-		}
-		synchronized (mouseLock) 
-		{
+		MyGameGUI.updateXY(mouseX, mouseY);
+		synchronized (mouseLock) {
 			isMousePressed = false;
 		}
 	}
@@ -1150,6 +1338,7 @@ public final class StdDraw implements ActionListener, MouseListener, MouseMotion
 			mouseY = StdDraw.userY(e.getY());
 		}
 	}
+
 
 	/***************************************************************************
 	 *  Keyboard interactions.
@@ -1232,318 +1421,45 @@ public final class StdDraw implements ActionListener, MouseListener, MouseMotion
 	 * This method cannot be called directly.
 	 */
 	@Override
-	public void keyReleased(KeyEvent e) 
-	{
+	public void keyReleased(KeyEvent e) {
 		synchronized (keyLock) {
 			keysDown.remove(e.getKeyCode());
 		}
 	}
 
-	/***************************************
-	 * Auxiliary functions
-	 ***************************************/
-	private static int getRobot(String s) 
-	{
-		try 
-		{
-			org.json.JSONObject jo = new org.json.JSONObject(s);
-			org.json.JSONObject gs = (org.json.JSONObject)jo.get("GameServer");
-			return gs.getInt("robots");
-		} 
-		catch (JSONException e) 
-		{
-			e.printStackTrace();
-		}
-
-		return 0;
-	}
-
-	public static void RefreshFrame(long timeToEnd)
-	{
-		enableDoubleBuffering();
-		clear();
-		setScale();
-		picture(0.5, 0.5, "map.png");
-		drawGraph(dGraph);
-		drawFruits();
-		drawRobots();
-		setPenColor(BLUE);
-		Font f=new Font("BOLD", Font.ITALIC, 18);
-		setFont(f);
-		text( StdDraw.rx.get_max()-0.002, StdDraw.ry.get_max()-0.0005,"time to end: "+ timeToEnd / 1000);
-		setPenColor(242, 19, 227);
-		int i = 1;
-		for(RobotG r: robots_List)
-		{
-			text(StdDraw.rx.get_max() - 0.002 - 0.0035*i, StdDraw.ry.get_max()-0.0005, 
-					"robot "+ (i++) + " score: " + r.getMoney());
-		}
-//		onscreen.drawImage(offscreenImage, 0, 0, null);
-		show();
-	}
-	
-	private static void drawRobots(int numberOfRobots, game_service game) 
-	{
-		String s = "";
-		while (numberOfRobots > 0)
-		{
-			s = JOptionPane.showInputDialog(null, "please choose starting vertex for robot number "+numberOfRobots);
-			if(s == null || s == "")
-				System.exit(0);
-
-			if(dGraph.getNode(Integer.parseInt(s))== null)continue;
-			node_data v = dGraph.getNode(Integer.parseInt(s));
-			game.addRobot(v.getKey());
-			RobotG r = new RobotG(dGraph, v.getKey());
-			robots_List.add(r);
-			numberOfRobots--;
-			setPenRadius(0.030);
-			setPenColor(BOOK_LIGHT_BLUE);
-			point(v.getLocation().x(), v.getLocation().y());
-		}
-	}
-
-	private static void drawRobots() 
-	{
-		for(RobotG r : robots_List)
-		{
-			setPenRadius(0.030);
-			setPenColor(BOOK_LIGHT_BLUE);
-			point(r.getLocation().x(), r.getLocation().y());
-		}
-	}
-
-	private static void parseFruits(List<String> fruits) 
-	{
-		Iterator<String> it = fruits.iterator();
-		while(it.hasNext())
-		{
-			Fruit f = getFruit(it.next());
-			fruits_List.add(f);
-		} 
-		drawFruits();
-	}
-
-	private static void drawFruits() 
-	{
-		for(Fruit f : fruits_List)
-		{
-			String fruit_icon = f.getType() == 1 ? "./apple.png" : "./banana.png";
-			picture(f.getLocation().x(), f.getLocation().y(), fruit_icon);
-		}
-	}
-
-	private static Fruit getFruit(String JSONFruit) 
-	{
-		double value = 0;
-		Point3D p=null;
-		try 
-		{
-			org.json.JSONObject jo = new org.json.JSONObject(JSONFruit);
-			org.json.JSONObject fruit = (JSONObject) jo.get("Fruit");
-			value =  fruit.getDouble("value");
-			p = new Point3D( (String)fruit.get("pos") );
-		} 
-		catch (JSONException e) 
-		{
-			e.printStackTrace();
-		}
-
-		return new Fruit(value, p, findEdge(p));
-	}
-	
-	private static edge_data findEdge(Point3D Fruit)//determine whether a given fruit exist on current edge
-	{
-		for(node_data src: dGraph.getV())
-		{
-			if(dGraph.getE(src.getKey()) != null)
-			{
-				for(edge_data edge:dGraph.getE(src.getKey()))
-				{
-					node_data dest = dGraph.getNode(edge.getDest());
-					double fruitToSrc = distance(Fruit, src.getLocation());
-					double fruitToDest = distance(Fruit, dest.getLocation());
-					double srcToDest = distance(src.getLocation(), dest.getLocation());
-					if(fruitToSrc + fruitToDest - srcToDest < epsilon)
-						return edge;
-				}
-			}
-		}
-		return null;
-	}
-
-	private void updateFruits(node_data dest, RobotG r) 
-	{
-		int size = dGraph.getV().size() - 1;
-		edge_data edge = null;
-		while(edge == null)
-			edge = dGraph.getEdge((int)(Math.random() * size) , (int)(Math.random() * size));
-		double x0 = dGraph.getNode(edge.getSrc()).getLocation().x();
-		double x1 = dGraph.getNode(edge.getDest()).getLocation().x();
-		double y0 = dGraph.getNode(edge.getSrc()).getLocation().y();
-		double y1 = dGraph.getNode(edge.getDest()).getLocation().y();
-		for(Fruit f : fruits_List)
-		{
-			if(r.getSrcNode() == f.getEdge().getSrc() &&  dest.getKey() == f.getEdge().getDest())
-			{
-				r.addMoney(f.getValue());
-				f.setEdge(edge);
-				double rnd = Math.random();
-				Point3D pos = new Point3D(x0 * rnd + x1 *(1-rnd), y0 * rnd + y1 *(1-rnd));
-				f.setPos(pos);
-				break;
-			}
-		}
-	}
-
-	private RobotG updateClosestRobot(node_data dest) 
-	{
-		RobotG closest = null;
-		boolean first = true;
-		for(RobotG r : robots_List)
-		{
-			if(first)
-			{
-				closest = r;
-				first = false;
-			}
-			else
-			{
-				double oldDiff = closest.getLocation().distance2D(dest.getLocation());
-				double newDiff = r.getLocation().distance2D(dest.getLocation());
-				if(newDiff < oldDiff )
-					closest = r;
-			}
-		}
-		return closest;
-	}
-
-	private node_data searchForNext(double mouseX2, double mouseY2) 
-	{
-		Point3D p = new Point3D(mouseX2, mouseY2);
-		node_data closest = null;
-		boolean first = true;
-		for(node_data v: dGraph.getV())
-		{
-			if(first)
-			{
-				closest = v;
-				first = false;
-			}
-			else
-			{
-				double oldDiff = closest.getLocation().distance2D(p);
-				double newDiff = v.getLocation().distance2D(p);
-				if(newDiff < oldDiff )
-					closest = v;
-			}
-		}
-		return closest;
-	}
 
 
-	private static double distance(Point3D p1, Point3D p2)
-	{
-		double a = Math.pow(p1.x()-p2.x(), 2);
-		double b = Math.pow(p1.y()-p2.y(), 2);
-		return Math.sqrt(a+b);
-	}
 
-	public static void drawGraph(graph G)
-	{
+	/**
+	 * Test client.
+	 *
+	 * @param args the command-line arguments
+	 */
+	public static void main(String[] args) {
+		StdDraw.square(0.2, 0.8, 0.1);
+		StdDraw.filledSquare(0.8, 0.8, 0.2);
+		StdDraw.circle(0.8, 0.2, 0.2);
 
-		rx = findRx(G);
-		ry = findRy(G);
-		setXscale(rx.get_min(),rx.get_max());
-		setYscale(ry.get_min(),ry.get_max());
-		setPenColor(Color.BLACK);
-		for(node_data vertex:G.getV())
-		{
-			double x0=vertex.getLocation().x();
-			double y0=vertex.getLocation().y();
-			if(G.getE(vertex.getKey())!=null)
-			{
-				for(edge_data edge:G.getE(vertex.getKey()))
-				{
-					setPenRadius(0.0015);
-					setPenColor(Color.orange);
-					Font f=new Font("BOLD", Font.ITALIC, 18);
-					setFont(f);
-					double x1=G.getNode(edge.getDest()).getLocation().x();
-					double y1=G.getNode(edge.getDest()).getLocation().y();
+		StdDraw.setPenColor(StdDraw.BOOK_RED);
+		StdDraw.setPenRadius(0.02);
+		StdDraw.arc(0.8, 0.2, 0.1, 200, 45);
 
-					//draw edges
-					line(x0, y0, x1, y1);
-					setPenRadius(0.015);
+		// draw a blue diamond
+		StdDraw.setPenRadius();
+		StdDraw.setPenColor(StdDraw.BOOK_BLUE);
+		double[] x = { 0.1, 0.2, 0.3, 0.2 };
+		double[] y = { 0.2, 0.3, 0.2, 0.1 };
+		StdDraw.filledPolygon(x, y);
 
-					//draw direction points
-					setPenColor(Color.GREEN);
-					point(x0*0.1+x1*0.9, y0*0.1+y1*0.9);
-
-					//draw dst vertex
-					setPenColor(Color.RED);
-					point(x1, y1);
-
-					//draw vertices weights
-					setPenColor(Color.BLACK);
-					text(x0,y0 + eps, vertex.getKey()+"");
-
-					//draw edges weight
-					//					StdDraw.setPenColor(Color.BLACK);
-					//					StdDraw.text((x0+x1)/2, (y0+y1)/2,edge.getWeight()+"");
-				}
-			}
-			setPenRadius(0.015);
-			setPenColor(Color.RED);
-			point(x0, y0);
-		}
-	}
-	
-	private static Range findRx(graph g) 
-	{
-		double minX=0, maxX=0;
-		boolean flag = true;
-		for(node_data node :g.getV())
-		{
-			double x = node.getLocation().x();
-			if(flag)
-			{
-				minX = x;
-				maxX = x;
-				flag = false;
-			}
-
-			if(x < minX) minX = x;
-			if(x > maxX) maxX = x;
-		}
-		double diff = (maxX-minX);
-		return new Range(minX - diff / 10, maxX + diff / 10);
-	}
-	
-	private static Range findRy(graph g) 
-	{
-		double minY=0, maxY=0;
-		boolean flag = true;
-		for(node_data node :g.getV())
-		{
-			double y = node.getLocation().y();
-			if(flag)
-			{
-				minY = y;
-				maxY = y;
-				flag = false;
-			}
-			if(y < minY) minY = y;
-			if(y > maxY) maxY = y;
-		}
-		double diff = maxY - minY;
-		return new Range(minY - diff / 10, maxY + diff / 10);
-	}
-
-	public static void main(String[] args) 
-	{
-		new MyGameGUI();
+		// text
+		StdDraw.setPenColor(StdDraw.BLACK);
+		StdDraw.text(0.2, 0.5, "black text");
+		StdDraw.setPenColor(StdDraw.WHITE);
+		StdDraw.text(0.8, 0.8, "white text");
 	}
 
 }
 
+
+//Copyright ֲ© 2000ג€�?2017, Robert Sedgewick and Kevin Wayne. 
+//Last updated: Mon Aug 27 16:43:47 EDT 2018.
