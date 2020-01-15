@@ -25,15 +25,20 @@ public class Fruit implements fruits
 	@Override
 	public int getType() 
 	{
-		if(this.edge.getDest() < this.edge.getSrc())
-			return -1;
-		return 1;
+		if(this.edge.getSrc() < this.edge.getDest())
+			return 1;
+		return -1;
 	}
 	
 	@Override
 	public double getValue() 
 	{
 		return value;
+	}
+
+	public edge_data getEdge() 
+	{
+		return edge;
 	}
 
 }

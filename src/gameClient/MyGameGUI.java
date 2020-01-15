@@ -283,7 +283,7 @@ private void drawRobots()
 /**
  * this method iterate over all fruit`s JSON string that given from server,
  * and fill fruits_List with fruits objects.
- * when finished call method drawFruits() to draw the functions
+ * when finished call method drawFruits() to draw the fruits
  * @param fruits - List of JSON strings, each represent fruit.
  * */
 private void drawFruits(List<String> fruits) 
@@ -299,8 +299,8 @@ private void drawFruits(List<String> fruits)
 }
 
 /**
- * auxiliary function to parse JSON string representing fruit,
- * using the parsed data it builds fruit object
+ * auxiliary function to parse JSON string representing a singlefruit,
+ * <br> using the parsed data it builds fruit object
  * @param JSONFruit - JSON string representing fruit.
  * @return new fruit object with the data inside the JSON string
  * */
@@ -325,6 +325,11 @@ private Fruit getFruit(String JSONFruit)
 	return new Fruit(value, p, findEdge(p, type));
 }
 
+/**
+ * places a small icon on location fruit`s coordinations
+ * <br>
+ * apple icon for fruit type 1 and banana icon for -1 fruit type
+ * */
 private void drawFruits() 
 {
 	for(Fruit f : fruits_List)

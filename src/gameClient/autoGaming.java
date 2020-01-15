@@ -13,6 +13,7 @@ import org.json.JSONObject;
 
 import Server.Game_Server;
 import Server.game_service;
+import algorithms.Graph_Algo;
 import dataStructure.DGraph;
 import dataStructure.edge_data;
 import dataStructure.graph;
@@ -28,6 +29,7 @@ public class autoGaming implements Runnable
 	private game_service game;
 	private Thread drawer;
 	private DGraph dGraph;
+	private Graph_Algo aGraph = new Graph_Algo();
 	private Range rx, ry;
 	private List<Fruit> fruits_List;
 	private List<RobotG> robots_List;
@@ -36,6 +38,7 @@ public class autoGaming implements Runnable
 
 	public autoGaming()
 	{
+		StdDraw.init();
 		//open input window for game number
 		while(true)
 		{
@@ -57,6 +60,7 @@ public class autoGaming implements Runnable
 		//read data about the chosen game from game server
 		dGraph = new DGraph();
 		dGraph.init(game.getGraph());
+		aGraph.init(dGraph);
 		System.out.println(game.toString());
 		//scale x and y
 		rx = findRx(dGraph);
@@ -65,30 +69,200 @@ public class autoGaming implements Runnable
 		//this thread is in charge of the game
 		drawer = new Thread(this, "Drawer");
 		drawer.start();
-
 	}
-	
+
 	@Override
 	public void run() 
 	{
 		drawGraph(dGraph);
 		int robots_num = getRobotsNumber(game.toString());
-		parseFruits(game.getFruits());
+		drawFruits(game.getFruits());
 		placeRobots(robots_num);
-		
+		drawRobots(game.getRobots());
+		if(JOptionPane.showConfirmDialog(null, "press YES to start the game", "TheMaze of Waze", JOptionPane.YES_OPTION) != JOptionPane.YES_OPTION)
+			System.exit(0);
+		game.startGame();
+		StdDraw.setFont();
+		StdDraw.setPenColor(Color.BLUE);
+		StdDraw.text( rx.get_max()-0.002, ry.get_max()-0.0005,"time to end: "+game.timeToEnd()/1000);
+		while(game.isRunning())
+		{
+			placeRobots();
+			RefreshFrame();
+			try 
+			{
+				Thread.sleep(100);
+			} 
+			catch (InterruptedException e) 
+			{
+				e.printStackTrace();
+			}
+		}
 	}
-	
+
+
 
 	/* ****************************************************
 	 *      ************Auxiliary functions***********
 	 *          *********************************        */
-	
+
+	/**
+	 * this method in charge of repaint the frame over and over
+	 * */
+	private void RefreshFrame()
+	{
+		StdDraw.enableDoubleBuffering();
+		StdDraw.clear();
+		StdDraw.setScale();
+		StdDraw.picture(0.5, 0.5, "map.png");
+		drawGraph(dGraph);
+		drawFruits(game.getFruits());
+		drawRobots(game.move());
+		StdDraw.setPenColor(Color.BLUE);
+		Font f=new Font("BOLD", Font.ITALIC, 18);
+		StdDraw.setFont(f);
+		StdDraw.text(rx.get_max()-0.002, ry.get_max()-0.0005,"time to end: "+ game.timeToEnd() / 1000);
+		StdDraw.show();
+	}
+
+	/**
+	 * 
+	 * */
+	private void placeRobots() 
+	{
+		for(RobotG r : robots_List)
+		{	
+			double maxSum = 0;
+			node_data v = null;
+			for(Fruit f : fruits_List)
+			{
+				double sum =0;
+				int dest = f.getEdge().getDest();
+				if(dest != r.getSrcNode())
+				{
+					List<node_data> list = aGraph.shortestPath(r.getSrcNode(), dest);
+					System.out.println(list);
+					//sum all edges weight on the way from robot to dest. 
+					for(int i =0;i<list.size()-1;i++)
+						sum += dGraph.getEdge(list.get(i).getKey(), list.get(i+1).getKey()).getWeight();
+					sum = f.getValue() / sum;
+					if(sum > maxSum)
+					{
+						maxSum = sum;
+						v = list.get(1); // index 0 is the src vertex so we take the next one
+					}
+				}
+			}
+			System.out.println("robot: "+r.getSrcNode() + " dest: "+v.getKey());
+			game.chooseNextEdge(r.getID(), v.getKey());
+		}
+	}
+
+	/**
+	 * this method find the best starting place for each robot.<br>
+	 * considering an edge that has fruit on, <br>
+	 * calculating fruit`s value divided by the time to walk through this edge (from src to dest).<br>
+	 * the first robot will be placed on the src that the edge going out from him got the best results.
+	 * @param robots_num - number of robots to place
+	 * */
+	private void placeRobots(int robots_num) 
+	{
+
+		edge_data currentEdge;
+		int vNumber = 0;
+		double  valuePerSecond, lastResult = Double.MAX_VALUE;
+		for(int i = 0;i<robots_num;i++)
+		{
+			double maxValuePerSecond = 0;
+			for(Fruit f : fruits_List)
+			{
+				currentEdge = f.getEdge();
+				valuePerSecond = f.getValue() / currentEdge.getWeight(); //calculate the value per second while "walking" on this edge.
+				if(valuePerSecond > maxValuePerSecond && valuePerSecond < lastResult)
+				{
+					maxValuePerSecond = valuePerSecond;
+					vNumber = currentEdge.getSrc();
+				}
+			}
+			lastResult = maxValuePerSecond;
+			game.addRobot(vNumber);
+		}
+
+	}
+
+	/**
+	 * this method iterate over all robots`s JSON string that given from server,
+	 * <br> and fill robots_List with robots objects.
+	 * when finished call method drawRobots() to draw the functions
+	 * @param robots - List of JSON strings, each represent a single robot.
+	 * */
+	private void drawRobots(List<String> robots) 
+	{
+		robots_List = new ArrayList<>();
+		Iterator<String> i = robots.iterator();
+		while(i.hasNext())
+		{
+			RobotG r = getRobot(i.next());
+			robots_List.add(r);
+		} 
+		drawRobots();
+	}
+
+	/**
+	 * auxiliary function to parse JSON string representing a single robot,
+	 * <br> using the parsed data it builds robot object
+	 * @param JSONRobot - JSON string representing robot.
+	 * @return new robot object with the data inside the JSON string
+	 * */
+	private RobotG getRobot(String JSONRobot) 
+	{
+		Point3D pos = null;
+		int src=0, dest=0,ID=0;
+		double money = 0;
+		try 
+		{
+			org.json.JSONObject jo = new org.json.JSONObject(JSONRobot);
+			org.json.JSONObject robot = (JSONObject) jo.get("Robot");
+			src = robot.getInt("src");
+			dest = robot.getInt("dest");
+			ID = robot.getInt("id");
+			money = robot.getDouble("value");
+			pos = new Point3D(robot.getString("pos"));
+		} 
+		catch (JSONException e) 
+		{
+			e.printStackTrace();
+		}
+		return new RobotG(src, ID, pos, dest, money);
+	}
+
+	/**
+	 * this method draw a small filled circle for each robot in the game <br>
+	 * each filled circle represent current robot`s location
+	 * */
+	private void drawRobots() 
+	{
+		int i = 1;
+		for(RobotG r : robots_List)
+		{
+			StdDraw.setPenRadius(0.040);
+			StdDraw.setPenColor(Color.MAGENTA);
+			StdDraw.point(r.getLocation().x(), r.getLocation().y());
+			StdDraw.setPenColor(242, 19, 227);
+			StdDraw.text(rx.get_max() - 0.002 - 0.0035*i, ry.get_max()-0.0005, 
+					"robot "+ (i++) + " score: " + r.getMoney());
+
+		}
+	}
+
+
 	/**
 	 * this method iterate over all fruit`s JSON string that given from server,
-	 * and fill fruits_List with fruits objects
+	 * and fill fruits_List with fruits objects <br>
+	 * * when finished call method drawFruits() to draw the fruits
 	 * @param fruits - List of JSON strings, each represent fruit.
 	 * */
-	private void parseFruits(List<String> fruits) 
+	private void drawFruits(List<String> fruits) 
 	{
 		fruits_List = new ArrayList<>();
 		Iterator<String> it = fruits.iterator();
@@ -96,9 +270,24 @@ public class autoGaming implements Runnable
 		{
 			Fruit f = getFruit(it.next());
 			fruits_List.add(f);
-		} 
+		}
+		drawFruits();
 	}
-	
+
+	/**
+	 * places a small icon on location fruit`s coordinations
+	 * <br>
+	 * apple icon for fruit type 1 and banana icon for -1 fruit type
+	 * */
+	private void drawFruits() 
+	{
+		for(Fruit f : fruits_List)
+		{
+			String fruit_icon = f.getType() == 1 ? "./apple.png" : "./banana.png";
+			StdDraw.picture(f.getLocation().x(), f.getLocation().y(), fruit_icon);
+		}
+	}
+
 	/**
 	 * auxiliary function to parse JSON string representing fruit,
 	 * using the parsed data it builds fruit object
@@ -125,7 +314,7 @@ public class autoGaming implements Runnable
 
 		return new Fruit(value, p, findEdge(p, type));
 	}
-	
+
 	/**
 	 * this method iterate over all vertices in current graph,
 	 * trying to find the edge which the given fruit belongs to.
@@ -147,9 +336,9 @@ public class autoGaming implements Runnable
 					double srcToDest = src.getLocation().distance2D( dest.getLocation());
 					if(fruitToSrc + fruitToDest - srcToDest < epsilon)
 					{
-						if(type == -1 && dest.getKey() > src.getKey())
+						if(type == 1 && src.getKey() < dest.getKey())
 							return edge;
-						if(type == 1 && dest.getKey() < src.getKey())
+						if(type == -1 && src.getKey() > dest.getKey())
 							return edge;
 					}
 				}
@@ -157,18 +346,7 @@ public class autoGaming implements Runnable
 		}
 		return null;
 	}
-	
-	/**
-	 * this method find the best starting place for each robot.
-	 * @param robots_num - number of robots to place
-	 * */
-	private void placeRobots(int robots_num) 
-	{
-		
-//		node_data [] v = new node_data[robots_num];
-		
-	}
-	
+
 	/**
 	 * parse from JSON how many robots are in the chosen game.
 	 * @param - JSON string contains the robots number
@@ -189,7 +367,7 @@ public class autoGaming implements Runnable
 
 		return 0;
 	}
-	
+
 	/**
 	 * this method draw a given graph on GUI window using StdDraw lib
 	 * @param g - the given graph
@@ -240,7 +418,7 @@ public class autoGaming implements Runnable
 			StdDraw.point(x0, y0);
 		}
 	}
-	
+
 	/**
 	 * iterate over all vertices in given graph to find min and max x values
 	 * @param g - the given graph
@@ -291,7 +469,7 @@ public class autoGaming implements Runnable
 		double diff = maxY - minY;
 		return new Range(minY - diff / 10, maxY + diff / 10);
 	}
-	
+
 	public static void main(String[] args) 
 	{
 		new autoGaming();
