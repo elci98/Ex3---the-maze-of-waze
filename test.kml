@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+<Placemark>
+<name>test point</name>
+<description>this is my first gnerating kml file try</description>
+<Point>
+<coordinates>35.187594216303474, 32.10378225882353, 0</coordinates>
+</Point>
+</Placemark>
+
+</kml>
