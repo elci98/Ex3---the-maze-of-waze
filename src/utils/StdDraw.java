@@ -270,12 +270,13 @@ public final class StdDraw implements ActionListener, MouseListener, MouseMotion
 	{
 		JMenuBar menuBar = new JMenuBar();
 		JMenu menu = new JMenu("Options");
-		JMenuItem restart = new JMenuItem("Restart");
-		JMenuItem exit = new JMenuItem("Exit");
-		restart.addActionListener(std);
-		exit.addActionListener(std);
-		menu.add(restart);
-		menu.add(exit);
+		JMenuItem Exit = new JMenuItem("Exit");
+		JMenuItem Load = new JMenuItem("Load Graph");
+		Exit.addActionListener(std);
+		Load.addActionListener(std);
+		menu.add(Load);
+		menu.addSeparator();
+		menu.add(Exit);
 		menuBar.add(menu);
 		return menuBar;
 	}
@@ -1208,12 +1209,30 @@ public final class StdDraw implements ActionListener, MouseListener, MouseMotion
 	 * This method cannot be called directly.
 	 */
 	@Override
-	public void actionPerformed(ActionEvent e) {
-		FileDialog chooser = new FileDialog(StdDraw.frame, "Use a .png or .jpg extension", FileDialog.SAVE);
-		chooser.setVisible(true);
-		String filename = chooser.getFile();
-		if (filename != null) {
-			StdDraw.save(chooser.getDirectory() + File.separator + chooser.getFile());
+	public void actionPerformed(ActionEvent e) 
+	{
+		switch(e.getActionCommand())
+		{
+		case "Exit":
+		{
+			System.exit(0);
+			break;
+		}
+		case "Load Graph":
+		{
+			FileDialog chooser = new FileDialog(StdDraw.frame, "Please choose a JSON graph file", FileDialog.LOAD);
+			chooser.setVisible(true);
+			String filename = chooser.getFile();
+			if (filename != null) 
+			{
+			}
+			break;
+		}
+		
+			
+		
+		
+		
 		}
 	}
 
