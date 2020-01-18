@@ -2,7 +2,6 @@ package utils;
 
 import java.awt.BasicStroke;
 import java.awt.Color;
-import java.awt.FileDialog;
 import java.awt.Font;
 import java.awt.FontMetrics;
 import java.awt.Graphics2D;
@@ -39,8 +38,10 @@ import javax.swing.JLabel;
 import javax.swing.JMenu;
 import javax.swing.JMenuBar;
 import javax.swing.JMenuItem;
+import javax.swing.JOptionPane;
 
 import gameClient.MyGameGUI;
+import gameClient.autoGaming;
 
 public final class StdDraw implements ActionListener, MouseListener, MouseMotionListener, KeyListener {
 
@@ -271,10 +272,10 @@ public final class StdDraw implements ActionListener, MouseListener, MouseMotion
 		JMenuBar menuBar = new JMenuBar();
 		JMenu menu = new JMenu("Options");
 		JMenuItem Exit = new JMenuItem("Exit");
-		JMenuItem Load = new JMenuItem("Load Graph");
+		JMenuItem kml = new JMenuItem("start KML export");
 		Exit.addActionListener(std);
-		Load.addActionListener(std);
-		menu.add(Load);
+		kml.addActionListener(std);
+		menu.add(kml);
 		menu.addSeparator();
 		menu.add(Exit);
 		menuBar.add(menu);
@@ -1218,21 +1219,42 @@ public final class StdDraw implements ActionListener, MouseListener, MouseMotion
 			System.exit(0);
 			break;
 		}
-		case "Load Graph":
+		case "start KML export":
 		{
-			FileDialog chooser = new FileDialog(StdDraw.frame, "Please choose a JSON graph file", FileDialog.LOAD);
-			chooser.setVisible(true);
-			String filename = chooser.getFile();
-			if (filename != null) 
-			{
+			if(Thread.getAllStackTraces().toString().contains("ADrawer"))
+			{	
+				if(!autoGaming.KMLexporting())
+				{
+					String input = JOptionPane.showInputDialog("please enter file name");
+					if(input != null && input != "")
+					{
+						autoGaming.startKMLExport(input);
+					}
+				}
+				else 
+					JOptionPane.showMessageDialog(null, "KML exporting is already on!");
+
 			}
-			break;
+			if(Thread.getAllStackTraces().toString().contains("MGDrawer"))
+			{	
+				if(!MyGameGUI.KMLexporting())
+				{
+					String input = JOptionPane.showInputDialog("please enter file name");
+					if(input != null && input != "")
+					{
+						MyGameGUI.startKMLExport(input);
+					}
+				}
+				else 
+					JOptionPane.showMessageDialog(null, "KML exporting is already on!");
+				
+			}
 		}
-		
-			
-		
-		
-		
+
+
+
+
+
 		}
 	}
 

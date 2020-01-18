@@ -8,7 +8,16 @@ public class Fruit implements fruits
 	private double value;
 	private Point3D pos;
 	private edge_data edge;
+	private boolean isDest=false;
 	
+	public boolean isDest() {
+		return isDest;
+	}
+
+	public void setDest(boolean isDest) {
+		this.isDest = isDest;
+	}
+
 	public Fruit(double value, Point3D pos, edge_data edge) 
 	{
 		this.value = value;
@@ -40,5 +49,10 @@ public class Fruit implements fruits
 	{
 		return edge;
 	}
+	@Override
+	public String toString()
+	{//				System.out.println(fDest.getEdge().getSrc()+"------>"+fDest.getEdge().getDest());
 
+		return edge.getSrc()+"----"+value+"----->"+edge.getDest();
+	}
 }

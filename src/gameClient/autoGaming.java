@@ -2,6 +2,8 @@ package gameClient;
 
 import java.awt.Color;
 import java.awt.Font;
+import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -35,28 +37,14 @@ public class autoGaming implements Runnable
 	private List<RobotG> robots_List;
 	private final static double epsilon = 0.0000001;
 	private final static double epsilon2 = 0.00019;
+	private static boolean KMLExporting = false;
+	private static String KML_file_name;
+	private static int g_number;
 
-	public autoGaming()
+	public autoGaming(int game_number)
 	{
-		StdDraw.init();
-		//open input window for game number
-		while(true)
-		{
-			String temp = JOptionPane.showInputDialog(null, "please choose a game between 0-23");
-			int game_number = temp != null ? Integer.parseInt(temp) : -1;
-			if(game_number >= 0  && game_number <= 23 )
-			{
-				game = Game_Server.getServer(game_number);
-				break;
-			}
-			else if(game_number == -1)
-				System.exit(0);
-			else 
-			{
-				JOptionPane.showMessageDialog(null, "invalid input, please choose between 0-23", "Error", JOptionPane.INFORMATION_MESSAGE);
-				continue;
-			}
-		}
+		game = Game_Server.getServer(game_number);
+		g_number = game_number;
 		//read data about the chosen game from game server
 		dGraph = new DGraph();
 		dGraph.init(game.getGraph());
@@ -67,7 +55,7 @@ public class autoGaming implements Runnable
 		ry = findRy(dGraph);
 
 		//this thread is in charge of the game
-		drawer = new Thread(this, "Drawer");
+		drawer = new Thread(this, "ADrawer");
 		drawer.start();
 	}
 
@@ -79,8 +67,12 @@ public class autoGaming implements Runnable
 		drawFruits(game.getFruits());
 		placeRobots(robots_num);
 		drawRobots(game.getRobots());
-		if(JOptionPane.showConfirmDialog(null, "press YES to start the game", "TheMaze of Waze", JOptionPane.YES_OPTION) != JOptionPane.YES_OPTION)
-			System.exit(0);
+		if(JOptionPane.showConfirmDialog(null, "turn on KML exporting??", "The Maze of Waze", JOptionPane.YES_OPTION) == JOptionPane.YES_OPTION)
+		{
+			String input = JOptionPane.showInputDialog("please enter file name");
+			if(input != null && input != "")
+				startKMLExport(input);
+		}
 		game.startGame();
 		StdDraw.setFont();
 		StdDraw.setPenColor(Color.BLUE);
@@ -98,9 +90,24 @@ public class autoGaming implements Runnable
 				e.printStackTrace();
 			}
 		}
+		if(KMLExporting)
+		{	
+			try
+			{
+				KML_Logger.closeFile(KML_file_name);
+			}
+			catch (IOException e) 
+			{
+				e.printStackTrace();
+			}
+		}
+		String message = "";
+		int i = 1;
+		for(RobotG r : robots_List)
+			message += "\trobot " + (i++) + " score: " + r.getMoney() +"\n";
+		JOptionPane.showMessageDialog(null, message);
+		System.exit(0);
 	}
-
-
 
 	/* ****************************************************
 	 *      ************Auxiliary functions***********
@@ -116,8 +123,8 @@ public class autoGaming implements Runnable
 		StdDraw.setScale();
 		StdDraw.picture(0.5, 0.5, "map.png");
 		drawGraph(dGraph);
-		drawFruits(game.getFruits());
 		drawRobots(game.move());
+		drawFruits(game.getFruits());
 		StdDraw.setPenColor(Color.BLUE);
 		Font f=new Font("BOLD", Font.ITALIC, 18);
 		StdDraw.setFont(f);
@@ -126,35 +133,45 @@ public class autoGaming implements Runnable
 	}
 
 	/**
-	 * 
+	 * This method determine the next step for each robot in the game,<br>
+	 * considering the shortest path to the most valuable fruit.
 	 * */
 	private void placeRobots() 
 	{
-		for(RobotG r : robots_List)
+		Iterator<RobotG> itr = robots_List.iterator();
+		while(itr.hasNext())
 		{	
+			RobotG r = itr.next();
+			Fruit fDest = null;
 			double maxSum = 0;
 			node_data v = null;
-			for(Fruit f : fruits_List)
+			Iterator<Fruit> it = fruits_List.iterator();
+			while(it.hasNext())
 			{
+				Fruit f = it.next();
 				double sum =0;
-				int dest = f.getEdge().getDest();
-				if(dest != r.getSrcNode())
+				int dest = f.getEdge().getSrc();
+				//				if(r.getSrcNode() == f.getEdge().getDest()) //avoid from steps in place
+				//					continue;
+				List<node_data> list = aGraph.shortestPath(r.getSrcNode(), dest);
+				list.add(dGraph.getNode(f.getEdge().getDest()));
+				//sum all edges weight on the way from robot to dest. 
+				for(int i = 0;i<list.size()-1;i++)
+					sum += dGraph.getEdge(list.get(i).getKey(), list.get(i+1).getKey()).getWeight();
+				sum = f.getValue() / sum;
+				if(sum > maxSum && !f.isDest())
 				{
-					List<node_data> list = aGraph.shortestPath(r.getSrcNode(), dest);
-					System.out.println(list);
-					//sum all edges weight on the way from robot to dest. 
-					for(int i =0;i<list.size()-1;i++)
-						sum += dGraph.getEdge(list.get(i).getKey(), list.get(i+1).getKey()).getWeight();
-					sum = f.getValue() / sum;
-					if(sum > maxSum)
-					{
-						maxSum = sum;
-						v = list.get(1); // index 0 is the src vertex so we take the next one
-					}
+					maxSum = sum;
+					// we disabled the option to check the shortestPath from vertex to itself, it guarantees that the 1 index will be occupied
+					v = list.get(1); 
+					fDest = f;
 				}
 			}
-			System.out.println("robot: "+r.getSrcNode() + " dest: "+v.getKey());
-			game.chooseNextEdge(r.getID(), v.getKey());
+			if(fDest != null)
+			{
+				fDest.setDest(true);
+				game.chooseNextEdge(r.getID(), v.getKey());
+			}
 		}
 	}
 
@@ -167,7 +184,6 @@ public class autoGaming implements Runnable
 	 * */
 	private void placeRobots(int robots_num) 
 	{
-
 		edge_data currentEdge;
 		int vNumber = 0;
 		double  valuePerSecond, lastResult = Double.MAX_VALUE;
@@ -187,7 +203,6 @@ public class autoGaming implements Runnable
 			lastResult = maxValuePerSecond;
 			game.addRobot(vNumber);
 		}
-
 	}
 
 	/**
@@ -198,12 +213,24 @@ public class autoGaming implements Runnable
 	 * */
 	private void drawRobots(List<String> robots) 
 	{
+		if(robots == null) return;
 		robots_List = new ArrayList<>();
 		Iterator<String> i = robots.iterator();
 		while(i.hasNext())
 		{
 			RobotG r = getRobot(i.next());
 			robots_List.add(r);
+			if(KMLExporting)
+			{
+				try 
+				{
+					KML_Logger.write(KML_file_name, r.getLocation().x(), r.getLocation().y(), "Robot", game.timeToEnd());
+				} 
+				catch (FileNotFoundException e) 
+				{
+					e.printStackTrace();
+				}
+			}
 		} 
 		drawRobots();
 	}
@@ -250,11 +277,9 @@ public class autoGaming implements Runnable
 			StdDraw.point(r.getLocation().x(), r.getLocation().y());
 			StdDraw.setPenColor(242, 19, 227);
 			StdDraw.text(rx.get_max() - 0.002 - 0.0035*i, ry.get_max()-0.0005, 
-					"robot "+ (i++) + " score: " + r.getMoney());
-
+					"\t robot "+ (i++) + " score: " + r.getMoney()+"\t\t");
 		}
 	}
-
 
 	/**
 	 * this method iterate over all fruit`s JSON string that given from server,
@@ -270,6 +295,18 @@ public class autoGaming implements Runnable
 		{
 			Fruit f = getFruit(it.next());
 			fruits_List.add(f);
+			if(KMLExporting)
+			{
+				String objType = f.getType() == 1 ? "Apple" : "Banana";
+				try 
+				{
+					KML_Logger.write(KML_file_name, f.getLocation().x(), f.getLocation().y(), objType, game.timeToEnd());
+				} 
+				catch (FileNotFoundException e) 
+				{
+					e.printStackTrace();
+				}
+			}
 		}
 		drawFruits();
 	}
@@ -407,10 +444,6 @@ public class autoGaming implements Runnable
 					//draw vertices weights
 					StdDraw.setPenColor(Color.BLACK);
 					StdDraw.text(x0,y0 + epsilon2, vertex.getKey()+"");
-
-					//draw edges weight
-					//					StdDraw.setPenColor(Color.BLACK);
-					//					StdDraw.text((x0+x1)/2, (y0+y1)/2,edge.getWeight()+"");
 				}
 			}
 			StdDraw.setPenRadius(0.02);
@@ -469,11 +502,25 @@ public class autoGaming implements Runnable
 		double diff = maxY - minY;
 		return new Range(minY - diff / 10, maxY + diff / 10);
 	}
-
-	public static void main(String[] args) 
+	
+	/**
+	 * Receives from the AWT thread(GUI Window) the order to create a new KML file.
+	 * @param file_name 
+	 * */
+	public static void startKMLExport(String file_name) 
 	{
-		new autoGaming();
+		if(!file_name.endsWith(".kml") && !file_name.endsWith(".KML"))
+			file_name += ".kml";
+		KML_file_name = file_name;
+		KML_Logger.createFile(file_name, g_number);
+		KMLExporting = true;
 	}
-
-
+	
+	/**
+	 * @return true if we already writing to KML file.
+	 * */
+	public static boolean KMLexporting()
+	{
+		return KMLExporting;
+	}
 }
