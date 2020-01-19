@@ -51,7 +51,7 @@ public class Fruit implements fruits
 	}
 	@Override
 	public String toString()
-	{//				System.out.println(fDest.getEdge().getSrc()+"------>"+fDest.getEdge().getDest());
+	{
 
 		return edge.getSrc()+"----"+value+"----->"+edge.getDest();
 	}

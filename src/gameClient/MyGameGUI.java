@@ -62,7 +62,7 @@ public class MyGameGUI implements Runnable
 				continue;
 			}
 		}
-		String [] choose = {"Manual Game", "Auto Game"};
+		String [] choose = {"Manual Game", "auto Game"};
 		String gameMode =(String) JOptionPane.showInputDialog(null, "Please  choose  game  mode", "The Maze of Waze", JOptionPane.INFORMATION_MESSAGE,  null, choose, choose[0]);
 		if((gameMode.equals("Manual Game")))
 		{
@@ -77,7 +77,7 @@ public class MyGameGUI implements Runnable
 			drawer = new Thread(this, "MGDrawer");
 			drawer.start();
 		}
-		else if((gameMode.equals("Auto Game")))
+		else if((gameMode.equals("auto Game")))
 			new autoGaming(game_number);
 		else
 			System.exit(0);

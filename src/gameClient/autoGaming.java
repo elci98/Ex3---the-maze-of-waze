@@ -49,7 +49,6 @@ public class autoGaming implements Runnable
 		dGraph = new DGraph();
 		dGraph.init(game.getGraph());
 		aGraph.init(dGraph);
-		System.out.println(game.toString());
 		//scale x and y
 		rx = findRx(dGraph);
 		ry = findRy(dGraph);
@@ -273,11 +272,10 @@ public class autoGaming implements Runnable
 		for(RobotG r : robots_List)
 		{
 			StdDraw.setPenRadius(0.040);
-			StdDraw.setPenColor(Color.MAGENTA);
-			StdDraw.point(r.getLocation().x(), r.getLocation().y());
 			StdDraw.setPenColor(242, 19, 227);
+			StdDraw.point(r.getLocation().x(), r.getLocation().y());
 			StdDraw.text(rx.get_max() - 0.002 - 0.0035*i, ry.get_max()-0.0005, 
-					"\t robot "+ (i++) + " score: " + r.getMoney()+"\t\t");
+					"\t  robot "+ (i++) + " score: " + (int)r.getMoney()+"   \t\t");
 		}
 	}
 
@@ -511,8 +509,7 @@ public class autoGaming implements Runnable
 	{
 		if(!file_name.endsWith(".kml") && !file_name.endsWith(".KML"))
 			file_name += ".kml";
-		KML_file_name = file_name;
-		KML_Logger.createFile(file_name, g_number);
+		KML_file_name = KML_Logger.createFile(file_name, g_number);
 		KMLExporting = true;
 	}
 	

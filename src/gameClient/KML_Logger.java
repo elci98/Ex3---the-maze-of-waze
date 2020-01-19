@@ -7,6 +7,7 @@ import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.io.PrintWriter;
 import java.time.LocalDateTime;
 
 
@@ -26,12 +27,12 @@ public class KML_Logger
 		File f = new File(file_name);
 		if(!f.exists())
 		{
-			System.out.println("file Name: "+file_name);
+			System.out.println("KML file saved as: "+file_name);
 			String out = "";
 			try 
 			{
 				f.createNewFile();
-				BufferedWriter br = new BufferedWriter(new FileWriter(f));
+				BufferedWriter bw = new BufferedWriter(new PrintWriter(new FileWriter(f)));
 				//every KML file MUST start with those two lines
 				out += "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\r\n"; 
 				out += "<kml xmlns=\"http://www.opengis.net/kml/2.2\">\r\n";
@@ -54,9 +55,8 @@ public class KML_Logger
 				out += "<href>http://maps.google.com/mapfiles/kml/shapes/cabs.png</href>\r\n";
 				out += "</Icon>\r\n";	
 				out += "</Style>\r\n\r\n";
-				
-				br.write(out);
-				br.close();
+				bw.write(out);
+				bw.close();
 			} 
 			catch (IOException e) 
 			{
@@ -71,13 +71,14 @@ public class KML_Logger
 			return createFile(file_name.substring(0, i) + i + ".kml",game_number);
 		}
 	}
+	
 	/**
 	 * this method writes to existing KML file.
 	 * @param file_name - the KML file to write to.
 	 * @param x - x value of the object.
 	 * @param y - y value of the object.
 	 * @param objType - the written object type: in order to give specific icon to every type of object.
-	 * @param timeToEnd - helps to write the correct timeSpan for this object.
+	 * @param timeToEnd - helps to give the correct timeSpan for this object.
 	 * @throws FileNotFoundException - if file_name does not exists
 	 * */
 	public static void write(String file_name, double x, double y, String objType, long TimeToEnd)throws FileNotFoundException
@@ -89,10 +90,9 @@ public class KML_Logger
 			throw new FileNotFoundException("error this file does not exist!");
 		try 
 		{
-			BufferedWriter br = new BufferedWriter(new FileWriter(file_name,true));
+			BufferedWriter bw = new BufferedWriter(new PrintWriter(new FileWriter(f, true)));
 			out += "<Placemark>\r\n";
-			out += "<name>" + objType + "</name>\r\n";
-			out += "<TimeSpan>\r\n<begin>" + t + "Z</begin>\r\n<end>" + (t+0.1) + "</end>\r\n</TimeSpan>\r\n";
+			out += "<TimeSpan>\r\n<begin>" + t + "</begin>\r\n<end>" + (t+0.1) + "</end>\r\n</TimeSpan>\r\n";
 			switch(objType)
 			{
 			case "Banana":
@@ -115,8 +115,8 @@ public class KML_Logger
 			out += "<Point>\r\n";
 			out += "<coordinates>"+ x + ", " + y + ", 0</coordinates>\r\n</Point>\r\n";
 			out += "</Placemark>\r\n\r\n";
-			br.write(out);
-			br.close();
+			bw.write(out);
+			bw.close();
 		} 
 		catch (IOException e) 
 		{
@@ -154,7 +154,7 @@ public class KML_Logger
 			throw new IOException("wrong file format ");
 		}
 		br.close();
-		BufferedWriter bw = new BufferedWriter(new FileWriter(file_name,true));
+		BufferedWriter bw = new BufferedWriter(new PrintWriter(new FileWriter(f, true)));
 		String out = "";
 		out += "</Document>\r\n";
 		//		out += "</Folder>\r\n";
@@ -162,48 +162,5 @@ public class KML_Logger
 		bw.write(out);
 		bw.close();
 		f.setWritable(false);
-
 	}
-	//	 <Placemark>
-	//	    <name>Simple placemark</name>
-	//	    <description>Attached to the ground. Intelligently places itself 
-	//	       at the height of the underlying terrain.</description>
-	//	    <Point>
-	//	      <coordinates>-122.0822035425683,37.42228990140251,0</coordinates>
-	//	    </Point>
-	//	  </Placemark>
-	//	</kml>
-
-	public static void main(String[] args) 
-	{
-		String f = createFile("test.kml",0);
-		try 
-		{
-			write(f, 35.187594216303474,32.10378225882353, "Apple",0);
-			Thread.sleep(100);
-			write(f, 35.20582803389831,32.10625380168067, "Banana",0);
-			Thread.sleep(100);
-			write(f, 35.20792948668281,32.10470908739496, "Apple",0);
-			Thread.sleep(100);
-			write(f, 35.20746249717514,32.10254648739496, "Banana",0);
-			Thread.sleep(100);
-			write(f, 35.20319591121872,32.1031462, "Robot",0);
-			Thread.sleep(100);
-			write(f, 35.19597880064568,32.10154696638656, "Robot",0);
-			Thread.sleep(100);
-			write(f, 35.18910131880549,32.103618700840336, "Robot",0);
-			closeFile(f);
-			write(f, 35.18910131880549,32.103618700840336, "Robot",0);
-			
-		} 
-		catch (IOException | InterruptedException e) 
-		{
-			e.printStackTrace();
-		}
-		createFile("test.kml",0);
-		createFile("test.kml",0);
-	}
-
-
-
 }
