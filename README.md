@@ -11,3 +11,4 @@ The automatic game is based on <a href="https://github.com/elci98/Ex2/blob/maste
 * <h3>KML File Export</h3>
   another option is to export the game to KML file that can be displayed in Google Earth.
   the coordinations of any object in the game is by Google Earth coordination system and they all located in Ariel, Israel.
+<a href="https://www.fxp.co.il/"><img src="https://i.imagesup.co/images2/a71dd256325f034b0a12dbab10b5a50a968ecb21.png" border="0" alt="The Maze of Waze" /></a>
