@@ -261,7 +261,7 @@ public final class StdDraw implements ActionListener, MouseListener, MouseMotion
 		frame.pack();
 		frame.requestFocusInWindow();
 		frame.setLocationRelativeTo(null);
-		picture(0.5, 0.5, "map.png");
+		picture(0.5, 0.5, "./images/map.png");
 		frame.setVisible(true);
 	}
 
@@ -273,8 +273,11 @@ public final class StdDraw implements ActionListener, MouseListener, MouseMotion
 		JMenu menu = new JMenu("Options");
 		JMenuItem Exit = new JMenuItem("Exit");
 		JMenuItem kml = new JMenuItem("start KML export");
+		JMenuItem sql = new JMenuItem("show SQL table");
 		Exit.addActionListener(std);
 		kml.addActionListener(std);
+		sql.addActionListener(std);
+		menu.add(sql);
 		menu.add(kml);
 		menu.addSeparator();
 		menu.add(Exit);
@@ -1247,17 +1250,17 @@ public final class StdDraw implements ActionListener, MouseListener, MouseMotion
 				}
 				else 
 					JOptionPane.showMessageDialog(null, "KML exporting is already on!");
-				
+
 			}
+			break;
 		}
-
-
-
-
-
+		case "show SQL table":
+		{
+			autoGaming.showSQLTable();
+			break;
+		}
 		}
 	}
-
 
 	/***************************************************************************
 	 *  Mouse interactions.

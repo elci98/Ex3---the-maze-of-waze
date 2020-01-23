@@ -1,14 +1,22 @@
 package gameClient;
 
+import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Font;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 
+import javax.swing.JFrame;
 import javax.swing.JOptionPane;
+import javax.swing.JTable;
 
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -40,9 +48,15 @@ public class autoGaming implements Runnable
 	private static boolean KMLExporting = false;
 	private static String KML_file_name;
 	private static int g_number;
+	public static final String jdbcUrl="jdbc:mysql://db-mysql-ams3-67328-do-user-4468260-0.db.ondigitalocean.com:25060/oop?useUnicode=yes&characterEncoding=UTF-8&useSSL=false";
+	public static final String jdbcUser="student";
+	public static final String jdbcUserPassword="OOP2020student";
+	public static Connection connection;
+	public static Statement statement;
 
 	public autoGaming(int game_number)
 	{
+		Game_Server.login(311326052);
 		game = Game_Server.getServer(game_number);
 		g_number = game_number;
 		//read data about the chosen game from game server
@@ -120,7 +134,7 @@ public class autoGaming implements Runnable
 		StdDraw.enableDoubleBuffering();
 		StdDraw.clear();
 		StdDraw.setScale();
-		StdDraw.picture(0.5, 0.5, "map.png");
+		StdDraw.picture(0.5, 0.5, "./images/map.png");
 		drawGraph(dGraph);
 		drawRobots(game.move());
 		drawFruits(game.getFruits());
@@ -318,7 +332,7 @@ public class autoGaming implements Runnable
 	{
 		for(Fruit f : fruits_List)
 		{
-			String fruit_icon = f.getType() == 1 ? "./apple.png" : "./banana.png";
+			String fruit_icon = f.getType() == 1 ? "./images/apple.png" : "./images/banana.png";
 			StdDraw.picture(f.getLocation().x(), f.getLocation().y(), fruit_icon);
 		}
 	}
@@ -500,7 +514,7 @@ public class autoGaming implements Runnable
 		double diff = maxY - minY;
 		return new Range(minY - diff / 10, maxY + diff / 10);
 	}
-	
+
 	/**
 	 * Receives from the AWT thread(GUI Window) the order to create a new KML file.
 	 * @param file_name 
@@ -512,7 +526,7 @@ public class autoGaming implements Runnable
 		KML_file_name = KML_Logger.createFile(file_name, g_number);
 		KMLExporting = true;
 	}
-	
+
 	/**
 	 * @return true if we already writing to KML file.
 	 * */
@@ -520,4 +534,147 @@ public class autoGaming implements Runnable
 	{
 		return KMLExporting;
 	}
+	/**
+	 * opens a JFrame window to present details on requested ID.<br>
+	 * the details received from series of queries to the DB server.
+	 * */
+	public static void showSQLTable()
+	{
+		Thread sqlThread = new Thread(new Runnable()
+		{
+			@Override
+			public void run() 
+			{
+				int games=0, uID;
+				boolean flag = false;
+				int [] Score={125,436,0,713,0,570,0,0,0,480,0,1050,0,310,0,0,235,0,0,250,200,0,0,1000};
+				int [] Moves={290,580,0,580,0,500,0,0,0,580,0,580,0,580,0,0,290,0,0,580,290,0,0,1140};
+				//the data matrix will be displayed on the JTable
+				Object[][] data = new Object[24][5];
+				String[] columnNames = {"level", "best score", "best moves", "games played", "level ranking"};
+				//get input from user
+				String input = JOptionPane.showInputDialog("please enter user ID");
+				if(input != null && input != "")
+					uID = Integer.parseInt(input);
+				else
+					uID = 311326052; // my id as default
+				//generate a query string
+				String query = "SELECT * FROM Logs WHERE UserID =" + uID;
+				//creating connection with the SQL server
+				sqlConnect();
+				try 
+				{
+					int bestScore = 0, lastLevel = 0; 
+					//executing query to SQL server
+					ResultSet rs = statement.executeQuery(query);
+					if(rs.next())
+						flag = true;
+					rs.beforeFirst();
+					while (rs.next())
+					{
+						int currentLevel = rs.getInt("levelID"); // parse level
+						if(currentLevel < 0 || Score[currentLevel] == 0)
+							continue;
+						if(currentLevel > lastLevel)
+						{
+							if(Score[lastLevel] != 0)
+								data[lastLevel][3] = games;
+							lastLevel = currentLevel;
+							bestScore = 0;
+							games = 0;
+						}
+						if(currentLevel < lastLevel && (int)data[currentLevel][3] >0)//Handles the case of playing lower game
+						{
+							games = (int)data[currentLevel][3]-1;
+							bestScore = (int)data[currentLevel][1];
+						}
+						games++;
+						int currentScore = rs.getInt("score"); // parse score
+						int currentMoves= rs.getInt("moves"); // parse moves
+						if(currentScore >= bestScore && currentScore >= Score[currentLevel] && currentMoves <= Moves[currentLevel] || 
+								currentScore >= bestScore && currentMoves <= Moves[currentLevel])
+						{
+							data[currentLevel][0] = currentLevel;
+							data[currentLevel][1] = currentScore;
+							data[currentLevel][2] = currentMoves;
+							bestScore = currentScore;
+						}
+					}
+					data[lastLevel][3] = games;
+					if(flag)
+					{
+						int[] users = new int[24];
+						for(int i = 0;i<24; i++)
+						{
+							if(Score[i] == 0 || data[i][2] == null)
+								continue;
+							int place = 0;
+							query = "SELECT * FROM oop.Logs where levelID = "+i+" and score >= "+Score[i]+" and moves <= "+Moves[i];
+							rs = statement.executeQuery(query);
+							while (rs.next())
+							{
+								int userID = rs.getInt("userID");
+								if(userID == 0)
+									continue;
+								users[i]++;
+								if((int)data[i][1] > rs.getInt("score"))
+								{
+									place++;
+								}
+							}
+							data[i][4] = place + " from "+ users[i];
+						}
+					}
+					statement.close();
+					rs.close();
+					connection.close();
+				} 
+				catch (SQLException e) 
+				{
+					e.printStackTrace();
+				}
+				if(flag)
+				{
+					JFrame frame = new JFrame("sql frame");
+					JTable jt = new JTable(data, columnNames) {
+						private static final long serialVersionUID = 1L;
+
+						public boolean isCellEditable(int row, int column) {                
+							return false;               
+						};
+					};
+					//JFrame properties
+					frame.setLayout(new BorderLayout());
+					frame.add(jt.getTableHeader(), BorderLayout.PAGE_START);
+					frame.add(jt, BorderLayout.CENTER);
+					frame.setResizable(false);
+					frame.setSize(400, 400);
+					frame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
+					frame.setAutoRequestFocus(true);
+					frame.setVisible(true);
+				}
+			}
+
+		},"sqlThread");
+		sqlThread.start();
+
+	}
+	/**
+	 * Auxiliary method to create an SQL connection.
+	 * */
+	private static void sqlConnect() 
+	{
+		try 
+		{
+			Class.forName("com.mysql.jdbc.Driver");
+			connection = DriverManager.getConnection(jdbcUrl, jdbcUser, jdbcUserPassword);
+			statement = connection.createStatement();
+		} 
+		catch (ClassNotFoundException | SQLException e) 
+		{
+			e.printStackTrace();
+		}
+
+	}
+
 }

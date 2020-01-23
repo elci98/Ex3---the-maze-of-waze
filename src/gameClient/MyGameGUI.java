@@ -40,32 +40,35 @@ public class MyGameGUI implements Runnable
 	private static int game_number;
 	private static boolean KMLExporting = false;
 	private static String KML_file_name;
-	
+
 	public MyGameGUI()
 	{
 		StdDraw.init();
 		//open input window for game number
 		while(true)
 		{
-			String temp = JOptionPane.showInputDialog(null, "please choose a game between 0-23");
-			game_number = temp != null ? Integer.parseInt(temp) : -1;
-			if(game_number >= 0  && game_number <= 23 )
+			String input = JOptionPane.showInputDialog(null, "please choose a game between 0-23");
+			if(input!=null && !input.equals(""))
+				game_number =  Integer.parseInt(input);
+			else 
+				System.exit(0);
+			if(game_number >= 0  && game_number <= 23 || game_number == -1 || game_number == -31 || game_number == -331)
 			{
-				game = Game_Server.getServer(game_number);
 				break;
 			}
-			else if(game_number == -1)
-				System.exit(0);
 			else 
 			{
 				JOptionPane.showMessageDialog(null, "invalid input, please choose between 0-23", "Error", JOptionPane.INFORMATION_MESSAGE);
 				continue;
 			}
 		}
-		String [] choose = {"Manual Game", "auto Game"};
+		String [] choose = {"auto Game", "Manual Game"};
 		String gameMode =(String) JOptionPane.showInputDialog(null, "Please  choose  game  mode", "The Maze of Waze", JOptionPane.INFORMATION_MESSAGE,  null, choose, choose[0]);
+		if(gameMode == null || gameMode == "")
+			System.exit(0);
 		if((gameMode.equals("Manual Game")))
 		{
+			game = Game_Server.getServer(game_number);
 			//read data about the chosen game from game server
 			dGraph = new DGraph();
 			dGraph.init(game.getGraph());
@@ -79,9 +82,6 @@ public class MyGameGUI implements Runnable
 		}
 		else if((gameMode.equals("auto Game")))
 			new autoGaming(game_number);
-		else
-			System.exit(0);
-
 	}
 	@Override
 	public void run() 
@@ -97,6 +97,7 @@ public class MyGameGUI implements Runnable
 				startKMLExport(input);
 		}
 		game.startGame();
+		System.out.println(game.timeToEnd());
 		StdDraw.setFont();
 		StdDraw.setPenColor(Color.BLUE);
 		StdDraw.text( rx.get_max()-0.002, ry.get_max()-0.0005,"time to end: "+game.timeToEnd()/1000);
@@ -152,7 +153,7 @@ public class MyGameGUI implements Runnable
 	/* **************************************************
 	 *               Auxiliary functions
 	 ********************************************************/
-	
+
 	/**
 	 * searches for the closest robot to dest vertex.
 	 * @param dest - the vertex the user wants to move some robot to.
@@ -252,10 +253,6 @@ public class MyGameGUI implements Runnable
 					//draw vertices weights
 					StdDraw.setPenColor(Color.BLACK);
 					StdDraw.text(x0,y0 + epsilon2, vertex.getKey()+"");
-
-					//draw edges weight
-					//					StdDraw.setPenColor(Color.BLACK);
-					//					StdDraw.text((x0+x1)/2, (y0+y1)/2,edge.getWeight()+"");
 				}
 			}
 			StdDraw.setPenRadius(0.02);
@@ -334,10 +331,8 @@ public class MyGameGUI implements Runnable
 			StdDraw.setPenColor(242, 19, 227);
 			StdDraw.text(rx.get_max() - 0.002 - 0.0035*i, ry.get_max()-0.0005, 
 					"robot "+ (i++) + " score: " + r.getMoney());
-
 		}
 	}
-
 	/**
 	 * this method iterate over all fruit`s JSON string that given from server,
 	 * and fill fruits_List with fruits objects.
@@ -404,7 +399,7 @@ public class MyGameGUI implements Runnable
 	{
 		for(Fruit f : fruits_List)
 		{
-			String fruit_icon = f.getType() == 1 ? "./apple.png" : "./banana.png";
+			String fruit_icon = f.getType() == 1 ? "./images/apple.png" : "./images/banana.png";
 			StdDraw.picture(f.getLocation().x(), f.getLocation().y(), fruit_icon);
 		}
 	}
@@ -430,9 +425,9 @@ public class MyGameGUI implements Runnable
 					double srcToDest = src.getLocation().distance2D( dest.getLocation());
 					if(fruitToSrc + fruitToDest - srcToDest < epsilon)
 					{
-						if(type == -1 && dest.getKey() > src.getKey())
+						if(type == -1 && src.getKey() > dest.getKey() )
 							return edge;
-						if(type == 1 && dest.getKey() < src.getKey())
+						if(type == 1 && src.getKey() < dest.getKey())
 							return edge;
 					}
 				}
@@ -485,7 +480,7 @@ public class MyGameGUI implements Runnable
 		StdDraw.enableDoubleBuffering();
 		StdDraw.clear();
 		StdDraw.setScale();
-		StdDraw.picture(0.5, 0.5, "map.png");
+		StdDraw.picture(0.5, 0.5, "./images/map.png");
 		drawGraph(dGraph);
 		drawFruits(game.getFruits());
 		drawRobots(game.move());
@@ -555,7 +550,7 @@ public class MyGameGUI implements Runnable
 		userX = mouseX;
 		userY = mouseY;
 	}
-	
+
 	/**
 	 * Receives from the AWT thread(GUI Window) the order to create a new KML file.
 	 * @param file_name 
@@ -567,7 +562,7 @@ public class MyGameGUI implements Runnable
 		KML_file_name = KML_Logger.createFile(file_name, game_number);
 		KMLExporting = true;
 	}
-	
+
 	/**
 	 * @return true if we already writing to KML file.
 	 * */
@@ -579,7 +574,4 @@ public class MyGameGUI implements Runnable
 	{
 		new MyGameGUI();
 	}
-
-
-
 }
